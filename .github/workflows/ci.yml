@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches-ignore:
-      - main
 
 env:
   DOCKER_IMAGE_BACKEND: devops-backend
@@ -219,7 +216,7 @@ jobs:
 
       - name: Start services with Docker Compose
         run: |
-          docker-compose up -d --build
+          docker compose up -d --build
           
           # Wait for services to be ready
           echo "Waiting for services to start..."
@@ -228,7 +225,7 @@ jobs:
       - name: Check all services
         run: |
           echo "=== Docker Compose Services ==="
-          docker-compose ps
+          docker compose ps
           
           echo -e "\n=== MongoDB Status ==="
           docker exec mongodb mongosh --eval "db.adminCommand('ping')" || echo "MongoDB not ready"
@@ -255,7 +252,7 @@ jobs:
             echo "✅ Backend API is healthy"
           else
             echo "❌ Backend API health check failed"
-            docker-compose logs backend
+            docker compose logs backend
             exit 1
           fi
 
@@ -269,7 +266,7 @@ jobs:
             echo "✅ Frontend is serving correctly"
           else
             echo "❌ Frontend health check failed"
-            docker-compose logs frontend
+            docker compose logs frontend
             exit 1
           fi
 
@@ -280,11 +277,11 @@ jobs:
 
       - name: Show service logs
         if: always()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Cleanup
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
 
   # Job 4: CI Summary
   ci-summary:
