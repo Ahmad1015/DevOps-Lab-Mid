@@ -189,7 +189,7 @@ jobs:
             echo "### 🐳 Frontend Docker Image" >> $GITHUB_STEP_SUMMARY
             echo "Pull command:" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "docker pull ${{ env.DOCKER_REGISTRY_OWNER }}/${{ env.DOCKER_IMAGE_FRONTEND }}:latest" >> $GITHUB_STEP_STEP_SUMMARY
+            echo "docker pull ${{ env.DOCKER_REGISTRY_OWNER }}/${{ env.DOCKER_IMAGE_FRONTEND }}:latest" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
