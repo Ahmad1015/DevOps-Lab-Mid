@@ -138,6 +138,7 @@ jobs:
           cd frontend
           npm run build
         env:
+          VITE_BASE_PATH: /DevOps-Lab-Mid/
           VITE_BACKEND_API_URL: https://your-backend-url.com/api/v1/
           VITE_PWD_SIGNUP_ENABLED: true
           VITE_GA_TRACKING_ID: ${{ secrets.GA_TRACKING_ID }}
