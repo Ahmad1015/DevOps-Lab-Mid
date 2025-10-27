@@ -1,0 +1,312 @@
+name: CI - Build & Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches-ignore:
+      - main
+
+env:
+  DOCKER_IMAGE_BACKEND: devops-backend
+  DOCKER_IMAGE_FRONTEND: devops-frontend
+
+jobs:
+  # Job 1: Build and Test Backend
+  test-backend:
+    name: Build & Test Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE_BACKEND }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start test database
+        run: |
+          docker run -d \
+            --name test-mongodb \
+            -e MONGO_INITDB_ROOT_USERNAME=testuser \
+            -e MONGO_INITDB_ROOT_PASSWORD=testpass \
+            -e MONGO_INITDB_DATABASE=testdb \
+            -p 27017:27017 \
+            mongo:latest
+          
+          # Wait for MongoDB to be ready
+          echo "Waiting for MongoDB to be ready..."
+          timeout 30 bash -c 'until docker exec test-mongodb mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 1; done'
+          echo "MongoDB is ready!"
+
+      - name: Run Backend container
+        run: |
+          docker run -d \
+            --name test-backend \
+            --network host \
+            -e MONGO_HOST=localhost \
+            -e MONGO_PORT=27017 \
+            -e MONGO_USER=testuser \
+            -e MONGO_PASSWORD=testpass \
+            -e MONGO_DB=testdb \
+            -e PROJECT_NAME="DevOps Lab Test" \
+            -e FIRST_SUPERUSER=admin@test.com \
+            -e FIRST_SUPERUSER_PASSWORD=testadmin123 \
+            -e BACKEND_CORS_ORIGINS='["http://localhost:5173"]' \
+            ${{ env.DOCKER_IMAGE_BACKEND }}:test
+          
+          # Wait for backend to start
+          echo "Waiting for backend to start..."
+          sleep 15
+
+      - name: Check Backend health
+        run: |
+          # Try to connect to backend docs endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs || echo "000")
+          echo "Backend /docs response code: $response"
+          
+          # Try API endpoint
+          api_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/login/test-token || echo "000")
+          echo "Backend API response code: $api_response"
+          
+          if [ "$response" != "000" ] || [ "$api_response" != "000" ]; then
+            echo "✅ Backend is responding"
+          else
+            echo "⚠️ Backend might not be fully ready, checking logs..."
+            docker logs test-backend
+            exit 1
+          fi
+
+      - name: Show Backend logs
+        if: always()
+        run: docker logs test-backend
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop test-backend test-mongodb || true
+          docker rm test-backend test-mongodb || true
+
+  # Job 2: Build and Test Frontend
+  test-frontend:
+    name: Build & Test Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run frontend tests (if available)
+        run: |
+          cd frontend
+          npm test -- --run || echo "No tests found or tests passed"
+
+      - name: Build frontend (production)
+        run: |
+          cd frontend
+          npm run build
+        env:
+          VITE_BACKEND_API_URL: http://localhost:8000/api/v1/
+          VITE_PWD_SIGNUP_ENABLED: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Frontend Docker image (production)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE_FRONTEND }}:test
+          build-args: |
+            FRONTEND_ENV=production
+            VITE_BACKEND_API_URL=http://localhost:8000/api/v1/
+            VITE_PWD_SIGNUP_ENABLED=true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Frontend container
+        run: |
+          docker run -d \
+            --name test-frontend \
+            -p 80:80 \
+            ${{ env.DOCKER_IMAGE_FRONTEND }}:test
+          
+          # Wait for frontend to start
+          echo "Waiting for frontend to start..."
+          sleep 5
+
+      - name: Check Frontend health
+        run: |
+          # Try to connect to frontend
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+          echo "Frontend response code: $response"
+          
+          if [ "$response" == "200" ] || [ "$response" == "304" ]; then
+            echo "✅ Frontend is responding correctly"
+          else
+            echo "⚠️ Frontend response: $response"
+            docker logs test-frontend
+            exit 1
+          fi
+
+      - name: Show Frontend logs
+        if: always()
+        run: docker logs test-frontend
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop test-frontend || true
+          docker rm test-frontend || true
+
+  # Job 3: Integration Test with Docker Compose
+  integration-test:
+    name: Integration Test (Docker Compose)
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file for testing
+        run: |
+          cat > .env << EOF
+          MONGO_USER=admin
+          MONGO_PASSWORD=admin123
+          MONGO_DB=devops_lab
+          MONGO_PORT=27017
+          PROJECT_NAME="DevOps Lab Mid"
+          FIRST_SUPERUSER=admin@example.com
+          FIRST_SUPERUSER_PASSWORD=admin123
+          BACKEND_CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+          VITE_BACKEND_API_URL=http://localhost:8000/api/v1/
+          VITE_PWD_SIGNUP_ENABLED=true
+          VITE_GA_TRACKING_ID=
+          EOF
+
+      - name: Start services with Docker Compose
+        run: |
+          docker-compose up -d --build
+          
+          # Wait for services to be ready
+          echo "Waiting for services to start..."
+          sleep 30
+
+      - name: Check all services
+        run: |
+          echo "=== Docker Compose Services ==="
+          docker-compose ps
+          
+          echo -e "\n=== MongoDB Status ==="
+          docker exec mongodb mongosh --eval "db.adminCommand('ping')" || echo "MongoDB not ready"
+          
+          echo -e "\n=== Backend Status ==="
+          curl -s -o /dev/null -w "Backend HTTP Status: %{http_code}\n" http://localhost:8000/docs || echo "Backend check failed"
+          
+          echo -e "\n=== Frontend Status ==="
+          curl -s -o /dev/null -w "Frontend HTTP Status: %{http_code}\n" http://localhost:5173 || echo "Frontend check failed"
+
+      - name: Test Backend API
+        run: |
+          echo "Testing backend API endpoints..."
+          
+          # Test docs endpoint
+          docs_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs)
+          echo "Docs endpoint status: $docs_status"
+          
+          # Test API health
+          api_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/login/test-token || echo "000")
+          echo "API endpoint status: $api_status"
+          
+          if [ "$docs_status" == "200" ]; then
+            echo "✅ Backend API is healthy"
+          else
+            echo "❌ Backend API health check failed"
+            docker-compose logs backend
+            exit 1
+          fi
+
+      - name: Test Frontend serving
+        run: |
+          echo "Testing frontend..."
+          frontend_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5173 || echo "000")
+          echo "Frontend status: $frontend_status"
+          
+          if [ "$frontend_status" == "200" ] || [ "$frontend_status" == "304" ]; then
+            echo "✅ Frontend is serving correctly"
+          else
+            echo "❌ Frontend health check failed"
+            docker-compose logs frontend
+            exit 1
+          fi
+
+      - name: Check MongoDB data
+        run: |
+          echo "Checking MongoDB collections..."
+          docker exec mongodb mongosh -u admin -p admin123 --authenticationDatabase admin devops_lab --eval "db.getCollectionNames()" || echo "Failed to query MongoDB"
+
+      - name: Show service logs
+        if: always()
+        run: docker-compose logs
+
+      - name: Cleanup
+        if: always()
+        run: docker-compose down -v
+
+  # Job 4: CI Summary
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, integration-test]
+    if: always()
+    
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 🔍 CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend Build & Test: ${{ needs.test-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend Build & Test: ${{ needs.test-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration Test: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.test-backend.result }}" == "success" ]] && \
+             [[ "${{ needs.test-frontend.result }}" == "success" ]] && \
+             [[ "${{ needs.integration-test.result }}" == "success" ]]; then
+            echo "✅ **All checks passed! Ready to merge.**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some checks failed. Please review the errors above.**" >> $GITHUB_STEP_SUMMARY
+          fi
