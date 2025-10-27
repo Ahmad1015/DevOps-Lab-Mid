@@ -39,9 +39,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["fastapi", "run", "--reload", "app/main.py"]
+    command: ["uv", "run", "fastapi", "run", "--reload", "app/main.py"]
     volumes:
       - ./backend:/app
+      - /app/.venv
 
   # Frontend React + Vite Service
   frontend:
