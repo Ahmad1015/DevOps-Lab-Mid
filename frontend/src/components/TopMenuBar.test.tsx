@@ -31,7 +31,6 @@ afterAll(() => server.close())
 
 function setup() {
   const user = userEvent.setup()
-  let a;
   const router = createMemoryRouter(
     [
       {
