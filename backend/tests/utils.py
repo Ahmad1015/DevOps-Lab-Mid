@@ -7,6 +7,7 @@ from app.auth.auth import create_access_token, get_hashed_password
 from app.config.config import settings
 from app.models import User
 import os
+import sys
 
 
 async def get_user_auth_headers(
