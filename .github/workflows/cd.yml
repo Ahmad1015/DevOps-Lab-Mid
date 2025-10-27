@@ -133,6 +133,11 @@ jobs:
           cd frontend
           npm ci
 
+      - name: Run frontend linting
+        run: |
+          cd frontend
+          npm run lint
+
       - name: Build frontend for GitHub Pages
         run: |
           cd frontend
