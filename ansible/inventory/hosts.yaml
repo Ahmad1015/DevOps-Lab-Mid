@@ -1,0 +1,35 @@
+---
+all:
+  children:
+    # EKS worker nodes (populated dynamically or manually)
+    eks_nodes:
+      hosts:
+        # Add EKS node IPs after cluster creation
+        # node1:
+        #   ansible_host: 10.0.1.x
+        # node2:
+        #   ansible_host: 10.0.1.y
+      vars:
+        ansible_user: ec2-user
+        ansible_ssh_private_key_file: ~/.ssh/eks-nodes.pem
+        
+    # Local development (localhost for testing)
+    local:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  vars:
+    # Common variables
+    project_name: "devops-final-lab"
+    deployment_env: "production"
+    
+    # Kubernetes configuration
+    kubernetes_namespace: "devops-lab"
+    
+    # Docker configuration
+    docker_registry: "{{ lookup('env', 'ECR_REGISTRY') | default('devops-lab-app', true) }}"
+    
+    # Application versions
+    app_version: "latest"

@@ -1,0 +1,72 @@
+---
+# Configure EKS Nodes Playbook
+# Run: ansible-playbook playbooks/configure-nodes.yaml
+
+- name: Configure EKS worker nodes
+  hosts: eks_nodes
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    docker_packages:
+      - docker
+      - containerd
+    
+  tasks:
+    - name: Update all packages
+      yum:
+        name: "*"
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Install common packages
+      package:
+        name:
+          - curl
+          - wget
+          - git
+          - jq
+          - unzip
+        state: present
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Configure system limits
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: "{{ item }}"
+      loop:
+        - "* soft nofile 65535"
+        - "* hard nofile 65535"
+        - "* soft nproc 65535"
+        - "* hard nproc 65535"
+
+    - name: Configure sysctl for Kubernetes
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
+        - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+        - { key: "net.ipv4.ip_forward", value: "1" }
+      ignore_errors: yes
+
+    - name: Display node information
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          IP: {{ ansible_default_ipv4.address | default('N/A') }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}

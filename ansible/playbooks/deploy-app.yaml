@@ -1,0 +1,154 @@
+---
+# Deploy Application Playbook
+# Run: ansible-playbook playbooks/deploy-app.yaml
+
+- name: Deploy DevOps Lab Application to Kubernetes
+  hosts: local
+  gather_facts: no
+  
+  vars:
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default('~/.kube/config', true) }}"
+    kubernetes_namespace: "devops-lab"
+    k8s_manifests_path: "{{ playbook_dir }}/../../k8s"
+    ecr_backend_image: "{{ ecr_backend_url }}:{{ app_version | default('latest') }}"
+    ecr_frontend_image: "{{ ecr_frontend_url }}:{{ app_version | default('latest') }}"
+
+  tasks:
+    - name: Verify kubectl is available
+      command: kubectl version --client
+      register: kubectl_version
+      changed_when: false
+
+    - name: Display kubectl version
+      debug:
+        msg: "{{ kubectl_version.stdout_lines }}"
+
+    - name: Check cluster connectivity
+      command: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if cluster is not reachable
+      fail:
+        msg: "Cannot connect to Kubernetes cluster. Please ensure kubeconfig is properly configured."
+      when: cluster_info.rc != 0
+
+    - name: Create namespace
+      command: kubectl apply -f {{ k8s_manifests_path }}/namespace.yaml
+      register: namespace_result
+      changed_when: "'created' in namespace_result.stdout or 'configured' in namespace_result.stdout"
+
+    - name: Apply ConfigMaps
+      command: kubectl apply -f {{ k8s_manifests_path }}/configmaps/
+      register: configmap_result
+      changed_when: "'created' in configmap_result.stdout or 'configured' in configmap_result.stdout"
+
+    - name: Apply Secrets
+      command: kubectl apply -f {{ k8s_manifests_path }}/secrets/
+      register: secrets_result
+      changed_when: "'created' in secrets_result.stdout or 'configured' in secrets_result.stdout"
+
+    - name: Apply Persistent Volume Claims
+      command: kubectl apply -f {{ k8s_manifests_path }}/storage/
+      register: pvc_result
+      changed_when: "'created' in pvc_result.stdout or 'configured' in pvc_result.stdout"
+
+    - name: Deploy MongoDB
+      command: kubectl apply -f {{ k8s_manifests_path }}/deployments/mongodb.yaml
+      register: mongodb_result
+      changed_when: "'created' in mongodb_result.stdout or 'configured' in mongodb_result.stdout"
+
+    - name: Wait for MongoDB to be ready
+      command: >
+        kubectl wait --for=condition=ready pod -l app=mongodb 
+        -n {{ kubernetes_namespace }} --timeout=120s
+      register: mongodb_wait
+      retries: 3
+      delay: 10
+      until: mongodb_wait.rc == 0
+
+    - name: Deploy Redis
+      command: kubectl apply -f {{ k8s_manifests_path }}/deployments/redis.yaml
+      register: redis_result
+      changed_when: "'created' in redis_result.stdout or 'configured' in redis_result.stdout"
+
+    - name: Wait for Redis to be ready
+      command: >
+        kubectl wait --for=condition=ready pod -l app=redis 
+        -n {{ kubernetes_namespace }} --timeout=60s
+      register: redis_wait
+      retries: 3
+      delay: 5
+      until: redis_wait.rc == 0
+
+    - name: Deploy Backend
+      command: kubectl apply -f {{ k8s_manifests_path }}/deployments/backend.yaml
+      register: backend_result
+      changed_when: "'created' in backend_result.stdout or 'configured' in backend_result.stdout"
+
+    - name: Deploy Frontend
+      command: kubectl apply -f {{ k8s_manifests_path }}/deployments/frontend.yaml
+      register: frontend_result
+      changed_when: "'created' in frontend_result.stdout or 'configured' in frontend_result.stdout"
+
+    - name: Wait for all deployments to be ready
+      command: >
+        kubectl wait --for=condition=available deployment --all 
+        -n {{ kubernetes_namespace }} --timeout=180s
+      register: deploy_wait
+      retries: 3
+      delay: 15
+      until: deploy_wait.rc == 0
+
+    - name: Get deployment status
+      command: kubectl get deployments -n {{ kubernetes_namespace }} -o wide
+      register: deployment_status
+      changed_when: false
+
+    - name: Display deployment status
+      debug:
+        msg: "{{ deployment_status.stdout_lines }}"
+
+    - name: Get service URLs
+      command: kubectl get svc -n {{ kubernetes_namespace }} -o wide
+      register: service_status
+      changed_when: false
+
+    - name: Display services
+      debug:
+        msg: "{{ service_status.stdout_lines }}"
+
+    - name: Get LoadBalancer URL (if available)
+      command: >
+        kubectl get svc frontend-service -n {{ kubernetes_namespace }} 
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+      register: lb_url
+      changed_when: false
+      failed_when: false
+
+    - name: Display application URL
+      debug:
+        msg: "Application URL: http://{{ lb_url.stdout }}"
+      when: lb_url.stdout != ""
+
+    - name: Deployment Summary
+      debug:
+        msg: |
+          ======================================
+          DEPLOYMENT COMPLETE!
+          ======================================
+          Namespace: {{ kubernetes_namespace }}
+          
+          Services deployed:
+          - MongoDB (StatefulSet)
+          - Redis (Deployment)
+          - Backend (Deployment, 2 replicas)
+          - Frontend (Deployment, 2 replicas)
+          
+          To check status:
+          kubectl get all -n {{ kubernetes_namespace }}
+          
+          To view logs:
+          kubectl logs -l app=backend -n {{ kubernetes_namespace }}
+          ======================================

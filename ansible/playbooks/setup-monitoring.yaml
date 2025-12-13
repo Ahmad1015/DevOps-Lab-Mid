@@ -1,0 +1,79 @@
+---
+# Setup Monitoring Playbook
+# Run: ansible-playbook playbooks/setup-monitoring.yaml
+
+- name: Deploy Prometheus and Grafana Monitoring Stack
+  hosts: local
+  gather_facts: no
+  
+  vars:
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default('~/.kube/config', true) }}"
+    monitoring_namespace: "monitoring"
+    k8s_monitoring_path: "../k8s/monitoring"
+
+  tasks:
+    - name: Create monitoring namespace
+      command: kubectl create namespace {{ monitoring_namespace }}
+      register: ns_result
+      failed_when: 
+        - ns_result.rc != 0
+        - "'already exists' not in ns_result.stderr"
+      changed_when: ns_result.rc == 0
+
+    - name: Apply Prometheus configuration
+      command: kubectl apply -f {{ k8s_monitoring_path }}/prometheus/ -n {{ monitoring_namespace }}
+      register: prometheus_result
+      changed_when: "'created' in prometheus_result.stdout or 'configured' in prometheus_result.stdout"
+
+    - name: Apply Grafana configuration
+      command: kubectl apply -f {{ k8s_monitoring_path }}/grafana/ -n {{ monitoring_namespace }}
+      register: grafana_result
+      changed_when: "'created' in grafana_result.stdout or 'configured' in grafana_result.stdout"
+
+    - name: Wait for Prometheus to be ready
+      command: >
+        kubectl wait --for=condition=available deployment/prometheus 
+        -n {{ monitoring_namespace }} --timeout=120s
+      register: prometheus_wait
+      retries: 3
+      delay: 10
+      until: prometheus_wait.rc == 0
+
+    - name: Wait for Grafana to be ready
+      command: >
+        kubectl wait --for=condition=available deployment/grafana 
+        -n {{ monitoring_namespace }} --timeout=120s
+      register: grafana_wait
+      retries: 3
+      delay: 10
+      until: grafana_wait.rc == 0
+
+    - name: Get monitoring services
+      command: kubectl get svc -n {{ monitoring_namespace }}
+      register: monitoring_svc
+      changed_when: false
+
+    - name: Display monitoring services
+      debug:
+        msg: "{{ monitoring_svc.stdout_lines }}"
+
+    - name: Monitoring Setup Summary
+      debug:
+        msg: |
+          ======================================
+          MONITORING SETUP COMPLETE!
+          ======================================
+          Namespace: {{ monitoring_namespace }}
+          
+          Services:
+          - Prometheus (metrics collection)
+          - Grafana (dashboards)
+          
+          Access Grafana:
+          kubectl port-forward svc/grafana -n {{ monitoring_namespace }} 3000:3000
+          Then open: http://localhost:3000
+          
+          Default Grafana credentials:
+          - Username: admin
+          - Password: admin (change on first login)
+          ======================================

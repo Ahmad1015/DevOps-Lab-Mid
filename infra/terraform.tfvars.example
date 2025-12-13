@@ -1,0 +1,23 @@
+# Example Terraform Variables - COPY to terraform.tfvars and modify
+# DO NOT commit terraform.tfvars to version control
+
+aws_region          = "us-east-1"
+environment         = "dev"
+project_name        = "devops-lab"
+cluster_name        = "devops-lab-cluster"
+cluster_version     = "1.29"
+
+# VPC Configuration
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["us-east-1a", "us-east-1b"]
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+# EKS Node Configuration (t3.small for cost savings)
+node_instance_type = "t3.small"
+node_desired_size  = 2
+node_min_size      = 1
+node_max_size      = 3
+
+# ECR Repository
+ecr_repository_name = "devops-lab-app"
