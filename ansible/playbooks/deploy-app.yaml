@@ -87,10 +87,18 @@
       register: backend_result
       changed_when: "'created' in backend_result.stdout or 'configured' in backend_result.stdout"
 
+    - name: Update Backend Image to ECR
+      command: kubectl set image deployment/backend backend={{ ecr_backend_image }} -n {{ kubernetes_namespace }}
+      changed_when: true
+
     - name: Deploy Frontend
       command: kubectl apply -f {{ k8s_manifests_path }}/deployments/frontend.yaml
       register: frontend_result
       changed_when: "'created' in frontend_result.stdout or 'configured' in frontend_result.stdout"
+
+    - name: Update Frontend Image to ECR
+      command: kubectl set image deployment/frontend frontend={{ ecr_frontend_image }} -n {{ kubernetes_namespace }}
+      changed_when: true
 
     - name: Wait for all deployments to be ready
       command: >

@@ -1,0 +1,47 @@
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Generic
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+*.tfvars
+
+# Ansible
+*.retry
+
+# User specific
+.env.production
+.env.development

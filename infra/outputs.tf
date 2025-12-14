@@ -71,6 +71,12 @@ output "ecr_login_command" {
   value       = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.backend.repository_url}"
 }
 
+# Database Outputs
+output "rds_endpoint" {
+  description = "RDS instance endpoint"
+  value       = aws_db_instance.main.endpoint
+}
+
 # Summary
 output "deployment_summary" {
   description = "Deployment summary"
@@ -83,6 +89,7 @@ output "deployment_summary" {
     VPC ID: ${aws_vpc.main.id}
     EKS Cluster: ${module.eks.cluster_name}
     EKS Endpoint: ${module.eks.cluster_endpoint}
+    RDS Endpoint: ${aws_db_instance.main.endpoint}
     
     ECR Backend: ${aws_ecr_repository.backend.repository_url}
     ECR Frontend: ${aws_ecr_repository.frontend.repository_url}

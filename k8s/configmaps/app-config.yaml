@@ -10,6 +10,6 @@ data:
   MONGO_DB: "devops_lab"
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"
-  BACKEND_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","*"]'
+  BACKEND_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
   VITE_BACKEND_API_URL: "http://backend-service:8000/api/v1/"
   VITE_PWD_SIGNUP_ENABLED: "true"
