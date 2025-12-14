@@ -9,7 +9,7 @@
   vars:
     kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default('~/.kube/config', true) }}"
     monitoring_namespace: "monitoring"
-    k8s_monitoring_path: "../k8s/monitoring"
+    k8s_monitoring_path: "{{ playbook_dir }}/../../k8s/monitoring"
 
   tasks:
     - name: Create monitoring namespace

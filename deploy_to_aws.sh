@@ -64,6 +64,9 @@ ansible-playbook -i ansible/inventory/hosts.yaml ansible/playbooks/deploy-app.ya
     -e "ecr_backend_image=$ECR_BACKEND:latest" \
     -e "ecr_frontend_image=$ECR_FRONTEND:latest"
 
+echo ">>> STEP 6: Deploying Monitoring Stack..."
+ansible-playbook -i ansible/inventory/hosts.yaml ansible/playbooks/setup-monitoring.yaml
+
 echo "============================================================"
 echo " DEPLOYMENT COMPLETE!"
 echo "============================================================"
