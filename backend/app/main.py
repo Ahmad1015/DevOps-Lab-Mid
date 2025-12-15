@@ -59,4 +59,10 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 
+
+# Prometheus Instrumentation
+from prometheus_fastapi_instrumentator import Instrumentator
+
+Instrumentator().instrument(app).expose(app)
+
 app.include_router(api_router, prefix=settings.API_V1_STR)
