@@ -159,12 +159,12 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "count(kube_pod_info{namespace=\"devops-lab\"})",
-              "legendFormat": "Total Pods",
+              "expr": "sum(http_requests_total)",
+              "legendFormat": "Total Requests",
               "refId": "A"
             }
           ],
-          "title": "Total Pods",
+          "title": "Total API Requests",
           "type": "stat"
         },
         {
@@ -227,7 +227,7 @@ data:
                 "uid": "prometheus"
               },
               "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
-              "legendFormat": "CPU Usage",
+              "legendFormat": "Cluster CPU",
               "refId": "A"
             }
           ],
@@ -315,12 +315,12 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum(container_memory_usage_bytes{namespace=\"devops-lab\"}) by (pod)",
-              "legendFormat": "{{pod}}",
+              "expr": "process_resident_memory_bytes{job=\"devops-lab-backend\"}",
+              "legendFormat": "Backend App Memory",
               "refId": "A"
             }
           ],
-          "title": "Memory Usage by Pod",
+          "title": "Memory Usage (App)",
           "type": "timeseries"
         },
         {
@@ -404,12 +404,12 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"devops-lab\"}[5m])) by (pod)",
-              "legendFormat": "{{pod}}",
+              "expr": "rate(process_cpu_seconds_total{job=\"devops-lab-backend\"}[5m])",
+              "legendFormat": "Backend App CPU",
               "refId": "A"
             }
           ],
-          "title": "CPU Usage by Pod",
+          "title": "CPU Usage (App)",
           "type": "timeseries"
         }
       ],
