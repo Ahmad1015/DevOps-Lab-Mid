@@ -59,10 +59,13 @@ We implemented a robust observability stack using Prometheus and Grafana.
 
 ### Infrastructure Provisioning (Terraform)
 ![Terraform](./screenshots/Terraform.png)
+### AWS
 ![ecr](./screenshots/ecr_aws.png)
 ![ekr](./screenshots/eks_aws.png)
 ![VPC](./screenshots/VPC_aws.png)
 ![Subnet](./screenshots/subnet_aws.png)
+### TerraForm Destroy:
+![Destroy](./screenshots/Terraform_destroy.png)
 
 ### Configuration Management (Ansible)
 ![ansible](./screenshots/ansible.png)
