@@ -23,7 +23,7 @@ below is the comprehensive view of the system, connecting the Git Pipeline, the 
 ![Architecture Diagram](./screenshots/Architecture_Diagram.png)
 
 ### Explanation of Architecture
-1.  **Pipeline**: Code changes trigger GitHub Actions, which builds the Docker images and uses Terraform/Ansible to update the AWS infrastructure.
+1.  **Pipeline**: Code changes trigger GitHub Actions, which builds the Docker images and pushes to Docker Hub whereas our aws script uses Terraform/Ansible to update the AWS infrastructure.
 2.  **Infrastructure**: A secure AWS VPC with private subnets for application logic (EKS Nodes) and public subnets for ingress (Load Balancers/NAT).
 3.  **Monitoring**: Prometheus runs as a sidecar/pod, thoroughly scraping metrics from the Backend and Nodes. Grafana visualizes this for the admin.
 
