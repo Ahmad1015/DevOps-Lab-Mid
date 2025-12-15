@@ -58,7 +58,7 @@ We implemented a robust observability stack using Prometheus and Grafana.
 ## 6. Project Evidence (Screenshots)
 
 ### Infrastructure Provisioning (Terraform)
-[Terraform](./screenshots/Terraform.png)
+![Terraform](./screenshots/Terraform.png)
 
 
 ### Configuration Management (Ansible)
