@@ -45,3 +45,7 @@ htmlcov/
 # User specific
 .env.production
 .env.development
+
+# Kubernetes secrets (allow example files)
+k8s/secrets/*
+!k8s/secrets/*.example
